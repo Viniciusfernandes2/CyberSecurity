@@ -3,101 +3,106 @@ import { useEffect, useState } from "react";
 
 import type { Iptuu } from "./Tipos/Iptuu";
 
+type UsuarioLogado = {
+  id: number;
+  nome: string;
+  email: string;
+  tipo: number;
+};
+
 function Gerenciamento() {
+  // const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  //const user = JSON.parse(localStorage.getItem("user") || "{}");
-
+  const [user, setUser] = useState<UsuarioLogado | null>(null);
   const [iptus, setIptus] = useState<Iptuu[]>([]);
   const [novoValor, setNovoValor] = useState<{ [key: number]: number }>({});
   const [menuAberto, setMenuAberto] = useState(false);
 
   useEffect(() => {
-
-    const buscarIptus = async () => {
-
+    const verificarUsuarioEBuscarIptus = async () => {
       try {
+        const payload = await axios.get(
+          "http://localhost:3001/usuario/usuario-logado",
+          { withCredentials: true }
+        );
+
+        const usuario = payload.data.user;
+        setUser(usuario);
+
+        if (usuario.tipo !== 1) {
+          alert("Você não possui permissão para acessar esta página.");
+          window.location.href = "/dashboard";
+          return;
+        }
 
         const response = await axios.get<{ iptu: Iptuu[] }>(
-          "http://localhost:3001/usuario/iptus"
+          "http://localhost:3001/usuario/iptus",
+          { withCredentials: true }
         );
 
         setIptus(response.data.iptu);
-
       } catch (error) {
-        console.error("Erro ao buscar IPTUs", error);
+        console.error("Erro ao validar usuário ou buscar IPTUs", error);
+        window.location.href = "/dashboard";
       }
-
     };
 
-    buscarIptus();
-
+    verificarUsuarioEBuscarIptus();
   }, []);
 
   const atualizarIptu = async (usuarioId: number) => {
-
     try {
-
       await axios.put(
         "http://localhost:3001/usuario/atualizar-iptu",
         {
           usuarioId: usuarioId,
           novoValor: novoValor[usuarioId]
-        }
+        },
+        { withCredentials: true }
       );
 
       alert("IPTU atualizado");
 
       // Atualiza lista novamente
       const response = await axios.get<{ iptu: Iptuu[] }>(
-        "http://localhost:3001/iptu"
+        "http://localhost:3001/usuario/iptus",
+        { withCredentials: true }
       );
 
       setIptus(response.data.iptu);
-
     } catch (error) {
-
       console.error("Erro ao atualizar IPTU", error);
-
     }
-
   };
 
   return (
-
     <div style={styles.container}>
-
       <header style={styles.header}>
-
         <h2>Gerenciamento de IPTUs</h2>
 
         <div style={{ position: "relative" }}>
-
           <button onClick={() => setMenuAberto(!menuAberto)}>
             ☰ Menu
           </button>
 
           {menuAberto && (
             <div style={styles.dropdown}>
-
               <button onClick={() => window.location.href = "/dashboard"}>
                 Voltar ao Dashboard
               </button>
-
             </div>
           )}
-
         </div>
-
       </header>
+
+      <p>Usuário logado: {user?.nome}</p>
 
       <h3 style={{ marginTop: "40px" }}>
         Lista de Munícipes e IPTUs
       </h3>
 
       {iptus.map((iptu) => (
-
         <div key={iptu.id} style={styles.card}>
-
           <p>
             <strong>Munícipe:</strong> {iptu.nome}
           </p>
@@ -121,25 +126,16 @@ function Gerenciamento() {
             }
           />
 
-          <button
-            onClick={() =>
-              atualizarIptu(iptu.usuario_id)
-            }
-          >
+          <button onClick={() => atualizarIptu(iptu.usuario_id)}>
             Atualizar IPTU
           </button>
-
         </div>
-
       ))}
-
     </div>
-
   );
 }
 
 const styles = {
-
   container: {
     padding: "40px",
     fontFamily: "Arial"
@@ -170,7 +166,6 @@ const styles = {
     padding: "10px",
     gap: "5px"
   }
-
 };
 
 export default Gerenciamento;

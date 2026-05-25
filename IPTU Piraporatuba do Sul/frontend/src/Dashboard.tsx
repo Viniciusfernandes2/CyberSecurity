@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 function Dashboard() {
   // const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const [user, setUser] = useState<{ id: number; nome: string, email: string, tipo: number } | null>(null);
+  const [user, setUser] = useState<{ id: number; nome: string; email: string; tipo: number } | null>(null);
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
@@ -18,30 +18,32 @@ function Dashboard() {
   const [htmlRetorno, setHtmlRetorno] = useState("");
 
   const handleGerenciamento = async (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        try {
-          
-            navigate("/gerenciamento");
-        } catch {
-            setMessage("Erro no login");
-        }
-    };
+    try {
+      navigate("/gerenciamento");
+    } catch {
+      setMessage("Erro no login");
+    }
+  };
+
   useEffect(() => {
     const buscarDados = async () => {
       try {
-
         const response = await axios.get<{ iptu: Iptuu[] }>(
-          "http://localhost:3001/usuario/iptu-por-usuario", {withCredentials: true}
+          "http://localhost:3001/usuario/iptu-por-usuario",
+          { withCredentials: true }
         );
+
         setIptu(response.data.iptu[0]);
 
         const payload = await axios.get(
-          "http://localhost:3001/usuario/usuario-logado",{withCredentials: true}
+          "http://localhost:3001/usuario/usuario-logado",
+          { withCredentials: true }
         );
+
         console.log("Payload do usuário logado:", payload.data.user);
         setUser(payload.data.user);
-
       } catch (error) {
         console.error("Erro ao buscar IPTU", error);
       }
@@ -58,18 +60,22 @@ function Dashboard() {
         console.error("Erro ao buscar comentários", error);
       }
     };
-      
-      buscarDados();
-      buscarComentarios();
+
+    buscarDados();
+    buscarComentarios();
   }, []);
 
   const enviarComentario = async () => {
     if (!novoComentario.trim()) return;
 
     try {
-      await axios.post("http://localhost:3001/comentario", {
-        texto: novoComentario,
-      }, { withCredentials: true });
+      await axios.post(
+        "http://localhost:3001/comentario",
+        {
+          texto: novoComentario,
+        },
+        { withCredentials: true }
+      );
 
       // Atualiza lista após enviar
       const response = await axios.get("http://localhost:3001/comentario");
@@ -80,16 +86,17 @@ function Dashboard() {
       console.error("Erro ao enviar comentário", error);
     }
   };
+
   const buscarCodigo = async () => {
     const response = await axios.get(
-      "http://localhost:3001/usuario/codigo-qr-ou-barra?tipo=" + tipoCodigo
-    , { withCredentials: true });
+      "http://localhost:3001/usuario/codigo-qr-ou-barra?tipo=" + tipoCodigo,
+      { withCredentials: true }
+    );
 
     setHtmlRetorno(response.data);
   };
 
   // dados fictícios de IPTU
-
 
   return (
     <div style={styles.container}>
@@ -103,10 +110,8 @@ function Dashboard() {
 
           {menuAberto && (
             <div style={styles.dropdown}>
-              {user?.id === 1 && (
-                <button
-                  onClick={handleGerenciamento}
-                >
+              {user?.tipo === 1 && (
+                <button onClick={handleGerenciamento}>
                   Gerenciar IPTUs {message}
                 </button>
               )}
@@ -121,6 +126,7 @@ function Dashboard() {
         {/* <p>Status: {iptu && iptu.pago ? "Pago ✅" : "Em aberto ❌"}</p> */}
         <p>Status: {iptu?.valor}</p>
       </div>
+
       <select
         value={tipoCodigo}
         onChange={(e) => setTipoCodigo(e.target.value)}
@@ -132,6 +138,7 @@ function Dashboard() {
       <button onClick={buscarCodigo}>
         Gerar Código
       </button>
+
       {htmlRetorno && (
         <div
           dangerouslySetInnerHTML={{
@@ -139,8 +146,10 @@ function Dashboard() {
           }}
         />
       )}
+
       <div style={{ padding: "40px" }}>
         <h2>Lista de Comentários</h2>
+
         <div style={{ marginBottom: "20px" }}>
           <h3>Adicionar Comentário</h3>
 
@@ -160,6 +169,7 @@ function Dashboard() {
             Enviar Comentário
           </button>
         </div>
+
         <ul>
           {comentarios.map((comentario, index) => (
             <li key={index}>
@@ -173,7 +183,6 @@ function Dashboard() {
         </ul>
       </div>
     </div>
-
   );
 }
 

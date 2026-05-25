@@ -1,17 +1,16 @@
 import { Request, Response } from "express";
 import db from "../database";
 import jwt from "jsonwebtoken";
-import jwtService from "../Services/jwtServices";
 import { RetornoPayload } from "../Tipos/retornoPayload";
-import ValidarToken  from "../Services/jwtServices";
+import ValidarToken from "../Services/jwtServices";
 
 export const usuarioLogado = async (req: Request, res: Response) => {
     const token = req.cookies.token;
     const payload = ValidarToken(token) as RetornoPayload | null;
+
     if (payload) {
-        res.json({ success:true ,user: payload });
-    }
-    else{
+        res.json({ success: true, user: payload });
+    } else {
         res.status(401).json({ success: false, message: "Token inválido" });
     }
 };
@@ -19,8 +18,8 @@ export const usuarioLogado = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
     const { email, password } = req.body;
     console.log(`Recebendo login para email: ${JSON.stringify(req.body)}`);
-    const query = 
-        `SELECT * FROM usuario WHERE email = $1 AND senha = $2`;
+
+    const query = `SELECT * FROM usuario WHERE email = $1 AND senha = $2`;
 
     console.log(`Query Executada: ${query}`);
 
@@ -28,26 +27,37 @@ export const login = async (req: Request, res: Response) => {
 
     if (result.rowCount && result.rowCount > 0) {
         const token = jwt.sign(
-            { 
-            id: result.rows[0].id, 
-            email: result.rows[0].email, 
-            tipo: result.rows[0].tipo_usuario_id,
-            nome: result.rows[0].nome
-            }
-            , (global as any).segredoJwt);
-        res.cookie("token", token,
-            {httpOnly: true, sameSite:"strict", secure: false});
+            {
+                id: result.rows[0].id,
+                email: result.rows[0].email,
+                tipo: result.rows[0].tipo_usuario_id,
+                nome: result.rows[0].nome
+            },
+            (global as any).segredoJwt
+        );
+
+        res.cookie("token", token, {
+            httpOnly: true,
+            sameSite: "strict",
+            secure: false
+        });
 
         res.json({ success: true });
     } else {
         res.status(401).json({ success: false, message: "Falha no login" });
     }
 };
+
 export const novoLogin = async (req: Request, res: Response) => {
     const { email, password, nome } = req.body;
-    if(!validarSenha(password)) {
-        return res.status(400).json({ success: false, message: "A senha deve conter pelo menos 8 caracteres, incluindo letras maiúsculas, minúsculas, números e caracteres especiais." });
+
+    if (!validarSenha(password)) {
+        return res.status(400).json({
+            success: false,
+            message: "A senha deve conter pelo menos 8 caracteres, incluindo letras maiúsculas, minúsculas, números e caracteres especiais."
+        });
     }
+
     const nomeNormalizado = normalizarNome(nome);
     const queryNomeIpuExiste = `SELECT * FROM iptu WHERE nome = $1`;
     const iptuResult = await db.query(queryNomeIpuExiste, [nomeNormalizado]);
@@ -62,41 +72,55 @@ export const novoLogin = async (req: Request, res: Response) => {
         const resultIdUsuario = await db.query(queryIdUsuario, [email, password]);
 
         const queryUpdateTabelaIptu = `UPDATE iptu set usuario_id = $1 WHERE nome = $2`;
-        const resultUpdate = await db.query(queryUpdateTabelaIptu, [resultIdUsuario.rows[0].id, nomeNormalizado]);
+        const resultUpdate = await db.query(queryUpdateTabelaIptu, [
+            resultIdUsuario.rows[0].id,
+            nomeNormalizado
+        ]);
 
         if (result.rowCount && result.rowCount > 0 && resultUpdate.rowCount && resultUpdate.rowCount > 0) {
             const token = jwt.sign(
-            { 
-            id: result.rows[0].id, 
-            email: result.rows[0].email, 
-            tipo: result.rows[0].tipo_usuario_id 
-            }
-            , (global as any).segredoJwt);
+                {
+                    id: result.rows[0].id,
+                    email: result.rows[0].email,
+                    tipo: result.rows[0].tipo_usuario_id
+                },
+                (global as any).segredoJwt
+            );
+
             res.json({ success: true, user: result.rows[0], token });
         } else {
             res.status(401).json({ success: false, message: "Falha no login" });
         }
-    } 
-    else 
-    {
-        res.status(404).json({ success: false, message: `Nome '${nome}' 'não encontrado no cadastro de municipes` });
+    } else {
+        res.status(404).json({
+            success: false,
+            message: `Nome '${nome}' 'não encontrado no cadastro de municipes`
+        });
     }
 };
 
 export const atualizarIptu = async (req: Request, res: Response) => {
-    const { usuarioId: usuarioId, novoValor: novoValor } = req.body;
-    const token = req.headers.authorization;
+    const { usuarioId, novoValor } = req.body;
+
+    const token = req.cookies.token;
     const payload = ValidarToken(token as string) as RetornoPayload | null;
 
-    if(!payload) {
-        return res.status(401).json({ success: false, message: "Token inválido" });
+    if (!payload) {
+        return res.status(401).json({
+            success: false,
+            message: "Token inválido"
+        });
     }
 
-    if(payload.tipo.valueOf() !== "1" && payload.tipo.valueOf() !== "2") {
-        res.status(404).json({ success: false, message: `Você não possui acesso a esse recurso.` });
+    if (payload.tipo.valueOf() !== "1") {
+        return res.status(403).json({
+            success: false,
+            message: "Você não possui acesso a esse recurso."
+        });
     }
 
     const query = `UPDATE iptu SET valor = $1 WHERE usuario_id = $2`;
+
     try {
         await db.query(query, [novoValor, usuarioId]);
         res.json({ message: "IPTU atualizado" });
@@ -109,12 +133,16 @@ export const getIptuPorIdUsuario = async (req: Request, res: Response) => {
     const token = req.cookies.token;
     const payload = ValidarToken(token as string) as RetornoPayload | null;
 
-    if(!payload) {
-        return res.status(401).json({ success: false, message: "Token inválido" });
+    if (!payload) {
+        return res.status(401).json({
+            success: false,
+            message: "Token inválido"
+        });
     }
 
     const query = `SELECT * FROM iptu WHERE usuario_id = $1`;
     console.log(`Query Executada: ${query}`);
+
     try {
         const result = await db.query(query, [payload.id]);
         console.log(`Retorno: ${result}`);
@@ -125,19 +153,26 @@ export const getIptuPorIdUsuario = async (req: Request, res: Response) => {
 };
 
 export const getIptus = async (req: Request, res: Response) => {
-    const usuarioId = req.query.usuarioId as string;
-    const token = req.headers.authorization;
+    const token = req.cookies.token;
     const payload = ValidarToken(token as string) as RetornoPayload | null;
 
-    if(!payload) {
-        return res.status(401).json({ success: false, message: "Token inválido" });
+    if (!payload) {
+        return res.status(401).json({
+            success: false,
+            message: "Token inválido"
+        });
     }
-    if(payload.tipo.valueOf() !== "1" && payload.tipo.valueOf() !== "2") {
-        res.status(404).json({ success: false, message: `Você não possui acesso a esse recurso.` });
+
+    if (payload.tipo.valueOf() !== "1") {
+        return res.status(403).json({
+            success: false,
+            message: "Você não possui acesso a esse recurso."
+        });
     }
-    
+
     const query = `SELECT * FROM iptu`;
     console.log(`Query Executada: ${query}`);
+
     try {
         const result = await db.query(query);
         res.json({ iptu: result.rows });
@@ -145,36 +180,46 @@ export const getIptus = async (req: Request, res: Response) => {
         res.status(500).json({ error: err.message });
     }
 };
+
 export const getQRCodeOrCodBarras = async (req: Request, res: Response) => {
     const tipo = req.query.tipo as string;
     const token = req.cookies.token;
     const payload = ValidarToken(token as string) as RetornoPayload | null;
-    if(!payload) {
-        return res.status(401).json({ success: false, message: "Token inválido" });
-    }
-    let codigoHtml = "";
-  if(tipo !== "codigoDeBarras" && tipo !== "qrcode") {
-    
-    return res.status(400).json({ error: "Tipo inválido" });
-  } 
-  if (tipo === "codigoDeBarras") {
-    codigoHtml = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=123456789" />`;
-  } else if (tipo === "qrcode") {
-    codigoHtml = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=QRCodeDemo" />`;
-  }
-const xss = require('xss');
 
+    if (!payload) {
+        return res.status(401).json({
+            success: false,
+            message: "Token inválido"
+        });
+    }
+
+    let codigoHtml = "";
+
+    if (tipo !== "codigoDeBarras" && tipo !== "qrcode") {
+        return res.status(400).json({ error: "Tipo inválido" });
+    }
+
+    if (tipo === "codigoDeBarras") {
+        codigoHtml = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=123456789" />`;
+    } else if (tipo === "qrcode") {
+        codigoHtml = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=QRCodeDemo" />`;
+    }
+
+    const xss = require("xss");
     const textoLimpo = xss(tipo);
-  res.send(`
+
+    res.send(`
     <h2>Tipo selecionado: ${textoLimpo}</h2>${codigoHtml}`);
 };
+
 export function normalizarNome(nome: string): string {
     return nome
-        .normalize("NFD") // separa letra do acento
-        .replace(/[\u0300-\u036f]/g, "") // remove os acentos
-        .toUpperCase() // deixa tudo maiúsculo
-        .trim(); // remove espaços extras no começo/fim
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .trim();
 }
+
 export function validarSenha(senha: string): boolean {
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     return regex.test(senha);
